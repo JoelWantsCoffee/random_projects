@@ -51,6 +51,7 @@ void* getIns(input *in) {
 }
 
 void resetKeys() {
+    printf("exit");
     system("xset r rate 220 20");
 }
 

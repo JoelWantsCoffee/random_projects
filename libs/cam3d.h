@@ -10,6 +10,8 @@ typedef struct _camera {
     float pFar;
     float fov;
     float fovRad;
+    
+    float zScale;
 
     float charRatio;
     float drawDist;
@@ -17,13 +19,14 @@ typedef struct _camera {
     int height;
 
     surface image;
-    surface dists;
+
+    float * dists;
 } camera;
 
 //functions
 void wipe(camera *cam) {
-    background(&(cam->dists), mColour(cam->drawDist));
     background(&(cam->image), mColour(0));
+    for (int i = 0; i<cam->width * cam->height; i++) cam->dists[i] = cam->drawDist;
 }
 
 void initCamera(camera *cam, int w, int h) {
@@ -43,14 +46,14 @@ void initCamera(camera *cam, int w, int h) {
     cam->charRatio = 2/1;
 
     initSurf(&(cam->image), w, h);
-    initSurf(&(cam->dists), w, h);
+    cam->dists = malloc(sizeof(float) * (w * h));
 
     wipe(cam);
 }
 
 void freeCamera(camera *cam) {
+    free(cam->dists);
     freeSurf(&cam->image);
-    freeSurf(&cam->dists);
 }
 
 void getProjectionMat(camera cam, mat * out) {
@@ -67,9 +70,10 @@ void set3d(camera *cam, float x, float y, float z, colour col) {
     int w = cam->width;
     int h = cam->height;
     if (((x >= 0) && (y >= 0)) && ((x < w) && (y < h))) {
-        if ((cam->dists.pixels[((int) floor(x)) + ((int) y) * w].r) > z) {
-            cam->dists.pixels[((int) floor(x)) + ((int) y) * h].r = z;
-            cam->image.pixels[((int) floor(x)) + ((int) y) * w] = col;
+        int i = ((int) x) + ((int) y) * w;
+        if (cam->dists[i] > z) {
+            cam->dists[i] = z;
+            cam->image.pixels[i] = col;
         }
     }
 }
@@ -106,91 +110,86 @@ void line3d(camera *cam, float x1, float y1, float z1, float x2, float y2, float
 }
 
 void fillTri3d(camera * cam, float x1, float y1, float z1, float x2, float y2, float z2,float x3, float y3, float z3, colour col) {
-    vector vecs [3];
-    int con = 1;
-    /*if (!ffloor(x1 - x2) && !ffloor(y1 - y2)) con = 0;
-    if (!ffloor(x2 - x3) && !ffloor(y2 - y3)) con = 0;
-    if (!ffloor(x3 - x1) && !floor(y3 - y1)) con = 0;*/
-    if (con) {
-    vecs[0].x = x1;
-    vecs[0].y = y1;
-    vecs[0].z = z1;
-    vecs[1].x = x2;
-    vecs[1].y = y2;
-    vecs[1].z = z2;
-    vecs[2].x = x3;
-    vecs[2].y = y3;
-    vecs[2].z = z3;
-
-    int top = 0;
-    int bottom = 0;
-
-    for (int i = 0; i<3;i++) {
-        if (vecs[i].y > vecs[top].y) top = i;
-        if (vecs[i].y < vecs[bottom].y) bottom = i;
-    }
-
-    float z = (z1 + z2 + z3)/3;
-
-    int middle = 0;
-
-    for (int i = 0; i<3; i++) {
-        if ((bottom != i) && (top != i)) middle = i;
-    }
-
-    vector v1 = vecSubtract(vecs[bottom], vecs[middle]);
-    vector v2 = vecSubtract(vecs[bottom], vecs[top]);
-
-    if (!floor(v1.y)) v1.y = 1;
-    if (!floor(v2.y)) v2.y = 1;
-
-    float v1a = v1.x / v1.y;
-    float v2a = v2.x / v2.y;
-
-    vector np = {
-        .x = (vecs[middle].y-vecs[bottom].y)*v2a + vecs[bottom].x,
-        .y =  vecs[middle].y,
+    vector v1 = {
+        .x = (int) x1,
+        .y = (int) y1,
+        .z = z1,
+    };
+    vector v2 = {
+        .x = (int) x2,
+        .y = (int) y2,
+        .z = z2,
+    };
+    vector v3 = {
+        .x = (int) x3,
+        .y = (int) y3,
+        .z = z3,
     };
 
-    for (int i = 0; i<=vecs[middle].y - vecs[bottom].y; i++) {
-        float v1x = v1a*i;
-        float v2x = v2a*i;
-        int dir;
+    vector *miny = &v1;
+    vector *maxy = &v1;
+    vector *midy = &v1;
 
-
-        //point(floor(vecs[bottom].x + v1x) , floor(i + vecs[bottom].y));
-        //point(floor(vecs[bottom].x + v2x) , floor(i + vecs[bottom].y));
-
-        int x1 = round(vecs[bottom].x + v1x);
-        int x2 = round(vecs[bottom].x + v2x);
-
-        int y = i + floor(vecs[bottom].y);
-
-        for (int j = MIN(x1, x2); j<=MAX(x1, x2); j++) {
-            set3d(cam, j, y, z, col);
-        }
+    if (v2.y < miny->y) {
+	    miny = &v2;
+    } else {
+	    maxy = &v2;
     }
 
-    vector vv1 = vecSubtract(vecs[middle], vecs[top]);
-    vector vv2 = vecSubtract(np, vecs[top]);
-
-    float vv1a = vv1.x/vv1.y;
-    float vv2a = vv2.x/vv2.y;
-
-    for (int i = 0; i<(vecs[top].y - vecs[middle].y); i++) {
-        float v1x = vv1a*i;
-        float v2x = vv2a*i;
-        int dir;
-
-        int x1 = round(vecs[middle].x + v1x);
-        int x2 = round(np.x + v2x);
-
-        int y = floor(i + vecs[middle].y);
-
-        for (int j = MIN(x1, x2); j<=MAX(x1, x2); j++) {
-            set3d(cam, j, y, z, col);
-        }
+    if (v3.y < miny->y) {
+        midy = miny;
+        miny = &v3;
+    } else if (v3.y > maxy->y) {
+        midy = maxy;
+        maxy = &v3;
+    } else {
+	    midy = &v3;
     }
+
+    for (int y = miny->y; y < midy->y; y++) {
+        float p1 = ((float) y - miny->y) / (midy->y - miny->y);
+        float p2 = ((float) y - miny->y) / (maxy->y - miny->y);
+
+        int x1 = (int) lerp(miny->x, midy->x, p1);
+        int x2 = (int) lerp(miny->x, maxy->x, p2);
+
+        float z1 = lerp(miny->z, midy->z, p1);
+        float z2 = lerp(miny->z, maxy->z, p2);
+        
+        int minx = MIN(x1, x2);
+        int maxx = MAX(x1, x2);
+
+        for (int x = MIN(x1, x2); x<MAX(x1, x2); x++) {
+
+            float pp = ((float) x - minx) / (maxx - minx);
+
+            float z = lerp(z1, z2, pp);
+
+            set3d(cam, x, y, z, col);
+        }
+    } 
+
+    for (int y = midy->y; y < maxy->y; y++) {
+        float p1 = ((float) y - midy->y) / (maxy->y - midy->y);
+        float p2 = ((float) y - miny->y) / (maxy->y - miny->y);
+        
+        int x1 = (int) lerp(midy->x, maxy->x, p1);
+        int x2 = (int) lerp(miny->x, maxy->x, p2);
+        
+        float z1 = lerp(midy->z, maxy->z, p1);
+        float z2 = lerp(miny->z, maxy->z, p2);
+
+        int minx = MIN(x1, x2);
+        int maxx = MAX(x1, x2);
+
+        for (int x = MIN(x1, x2); x<MAX(x1, x2); x++) {
+
+            float pp = ((float) x - minx) / (maxx - minx);
+
+            float z = lerp(z1, z2, pp);
+
+            set3d(cam, x, y, z, col);    
+        }
     }
 }
 
@@ -206,6 +205,10 @@ void tri3d(camera *cam, tri t) {
     float y3 = (t.p3.y + 1) * h/2;
 
     fillTri3d(cam, x1, y1, t.p1.z, x2, y2, t.p2.z, x3, y3, t.p3.z, mColour(t.var));
+
+    //setCol(&cam->image, mColour(t.var));
+
+    //fillTriangle(&cam->image, x1, y1, x2, y2, x3, y3);
 
     // line3d(cam, x1, y1, t.p1.z, x2, y2, t.p2.z);
     // line3d(cam, x2, y2, t.p2.z, x3, y3, t.p3.z);
@@ -227,7 +230,9 @@ void clipMeshToCam(mesh *me) {
     clipMesh(me, pl4, pn4);
 }
 
-void mesh3d(camera *cam, mesh me) {
+void mesh3d(camera *cam, mesh m) {
+    mesh me;
+    dupeMesh(&m,&me);
     vector l = {.x = 1, .y = -1, .z = -1};
     vecNormalise(&l);
 
@@ -235,7 +240,7 @@ void mesh3d(camera *cam, mesh me) {
 
     translateMesh(&me, cam->pos.x, cam->pos.y, -cam->pos.z);
     rotateMesh(&me, cam->vrot, cam->hrot, 0);
-    mat proj;
+    mat proj; 
     vector pl = {.x = 0, .y = 0, .z = cam->pNear};
     vector pn = {.x = 0, .y = 0, .z = 1};
 
@@ -244,9 +249,14 @@ void mesh3d(camera *cam, mesh me) {
     }
 
     getProjectionMat(*cam, &proj);
-    //clipMesh(&me, pl, pn);
+    clipMesh(&me, pl, pn);
     meshmultmat(&me, proj);
-    //clipMeshToCam(&me);
+    
+
+    //copyMesh(&newMesh, &me);
+
+    clipMeshToCam(&me);
+    
     vector zero = {.x = 0, .y = 0, .z = 0};
     for (int i = 0; i<me.faceCount; i++) {
         if (me.faces[i].var >= 0) tri3d(cam, ftot(me.faces[i]));

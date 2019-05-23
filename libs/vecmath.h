@@ -57,7 +57,9 @@ void initMesh(mesh * in, int ptLen, int faLen) {
 
 void freeMesh(mesh * me) {
     free(me->pts);
+    me->pts = NULL;
     free(me->faces);
+    me->faces = NULL;
 }
 
 mat matmultmat(mat one, mat two) {
@@ -347,9 +349,23 @@ int clipFace(vector pl, vector pn, face *in, face *out [2], vector *op [2], int 
     return 0;
 }
 
+void copyMesh(mesh *in, mesh *out) {
+    out->pts = in->pts;
+    out->ptCount = in->ptCount;
+    out->faces = in->faces;
+    out->faceCount = in->faceCount;
+}
+
 void dupeMesh(mesh *in, mesh *out) {
     initMesh(out, in->ptCount, in->faceCount);
-    for (int i = 0; i<in->ptCount; i++) out->pts[i] = in->pts[i];
+    for (int i = 0; i<in->ptCount; i++) {
+        vector p = {
+            .x = in->pts[i].x,
+            .y = in->pts[i].y,
+            .z = in->pts[i].z
+        };
+        out->pts[i] = p;
+    }
     for (int i = 0; i<in->faceCount; i++) {
         out->faces[i].p1 = &out->pts[in->faces[i].p1 - in->pts];
         out->faces[i].p2 = &out->pts[in->faces[i].p2 - in->pts];
@@ -380,8 +396,6 @@ void clipMesh(mesh *me, vector pl, vector pn) {
         
         
         initMesh(&out, me->ptCount + ptCount, faCount);
-
-        //dupeMesh(me, &out);
         
         ptCount = 0;
         faCount = 0;
@@ -400,13 +414,13 @@ void clipMesh(mesh *me, vector pl, vector pn) {
             faCount += faCountInc;
             ptCount += t;
         }
-    } else {
-        initMesh(&out, 1, 1);
-        out.ptCount = 0;
-        out.faceCount = 0;
+
+
+        //freeMesh(me);
+
+        copyMesh(&out, me);
+
     }
-    freeMesh(me);
-    //*me = out;
-    dupeMesh(&out, me);
-    freeMesh(&out);
+    
+    // *me = out;
 }

@@ -19,7 +19,16 @@ typedef struct _surface {
     colour * pixels;
 } surface;
 
+typedef struct _dvec2d {
+    int x;
+    int y;
+} dvec2d;
+
 //functions
+float lerp(float a, float b, float dist) {
+    return (a*(1 - dist) + b*dist);
+}
+
 void initSurf(surface *surf, int w, int h) {
     strcpy(surf->cols, " .,>xX#@@");
     surf->colLen = 9;
@@ -67,18 +76,18 @@ void drawStipple(surface surf) {
         for (int i = 0; i<surf.width; i++) {
             colour col = td.pixels[getIndex(&td, i, j)];
 	    
-	    int gCol = MAX(MIN(((float)col.r + col.g + col.b)/(3), 255), 0);
-	    int aCol = round((surf.colLen-1) * gCol / 255) * 255/(surf.colLen-1);	    
+            int gCol = MAX(MIN(((float)col.r + col.g + col.b)/(3), 255), 0);
+            int aCol = round((surf.colLen-1) * gCol / 255) * 255/(surf.colLen-1);	    
 
-	    float error = gCol - aCol;
-	    
-	    td.pixels[getIndex(&td, i, j)] = mColour((int) aCol);
+            float error = gCol - aCol;
+            
+            td.pixels[getIndex(&td, i, j)] = mColour((int) aCol);
 
-	    mPlus(&td.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , j				) ], (int) error * 7.0 / 16.0);
-	    mPlus(&td.pixels[ getIndex(&td, MAX(i - 1, 0)	    , MIN(j + 1, td.height-1)	) ], (int) error * 3.0 / 16.0);
-	    mPlus(&td.pixels[ getIndex(&td, i			    , MIN(j + 1, td.height-1)	) ], (int) error * 5.0 / 16.0);
-	    mPlus(&td.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , MIN(j + 1, td.height-1)	) ], (int) error * 1.0 / 16.0);
-         }
+            mPlus(&td.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , j				) ], (int) error * 7.0 / 16.0);
+            mPlus(&td.pixels[ getIndex(&td, MAX(i - 1, 0)	    , MIN(j + 1, td.height-1)	) ], (int) error * 3.0 / 16.0);
+            mPlus(&td.pixels[ getIndex(&td, i			    , MIN(j + 1, td.height-1)	) ], (int) error * 5.0 / 16.0);
+            mPlus(&td.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , MIN(j + 1, td.height-1)	) ], (int) error * 1.0 / 16.0);
+        }
     } 
     draw(td);
     freeSurf(&td);
@@ -90,7 +99,7 @@ void setCol(surface *surf, colour col) {
 
 void set(surface *surf, int x, int y) {
     if ((x >= 0) && (y >= 0) && (x < surf->width) && (y < surf->height)) {
-        surf->pixels[(int) (x + ( y * surf->width))] = surf->lastCol;
+        surf->pixels[(x + (y * surf->width))] = surf->lastCol;
     }
 }
 
@@ -127,9 +136,62 @@ void triangle(surface *surf, float x1, float y1, float x2, float y2, float x3, f
 }
 
 void fillTriangle(surface *surf, float x1, float y1, float x2, float y2, float x3, float y3) {
-    line(surf, x1, y1, x2, y2);
-    line(surf, x2, y2, x3, y3);
-    line(surf, x3, y3, x1, y1);
+    dvec2d v1 = {
+        .x = (int) x1,
+        .y = (int) y1,
+    };
+    dvec2d v2 = {
+        .x = (int) x2,
+        .y = (int) y2,
+    };
+    dvec2d v3 = {
+        .x = (int) x3,
+        .y = (int) y3,
+    };
+
+    dvec2d *miny = &v1;
+    dvec2d *maxy = &v1;
+    dvec2d *midy = &v1;
+
+    if (v2.y < miny->y) {
+	    miny = &v2;
+    } else {
+	    maxy = &v2;
+    }
+
+    if (v3.y < miny->y) {
+        midy = miny;
+        miny = &v3;
+    } else if (v3.y > maxy->y) {
+        midy = maxy;
+        maxy = &v3;
+    } else {
+	    midy = &v3;
+    }
+
+    for (int y = miny->y; y < midy->y; y++) {
+        float p1 = ((float) y - miny->y) / (midy->y - miny->y);
+        float p2 = ((float) y - miny->y) / (maxy->y - miny->y);
+
+        int x1 = (int) lerp(miny->x, midy->x, p1);
+        int x2 = (int) lerp(miny->x, maxy->x, p2);
+        
+        for (int x = MIN(x1, x2); x<MAX(x1, x2); x++) {
+            set(surf, x, y);
+        }
+    } 
+
+    for (int y = midy->y; y < maxy->y; y++) {
+        float p1 = ((float) y - midy->y) / (maxy->y - midy->y);
+        float p2 = ((float) y - miny->y) / (maxy->y - miny->y);
+        
+        int x1 = (int) lerp(midy->x, maxy->x, p1);
+        int x2 = (int) lerp(miny->x, maxy->x, p2);
+        
+        for (int x = MIN(x1, x2); x<MAX(x1, x2); x++) {
+            set(surf, x, y);	    
+        }
+    }
 }
 
 void background(surface *surf, colour col) {
