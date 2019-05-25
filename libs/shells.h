@@ -38,7 +38,7 @@ void* getIns(input *in) {
     char b[5];
     b[0] = ' ';
     int size = sizeof(in->on);
-    //system("xset r rate 10 100");
+    system("xset r rate 10 100");
     read(STDIN_FILENO, b, 5);
     for (int i = 0; i<size; i++) {
         if (b[0] == in->keys[i]) {

@@ -11,6 +11,7 @@ typedef struct _vector {
     float y;
     float z;
     float w;
+    int v;
 } vector;
 
 typedef struct _tri {
@@ -51,7 +52,7 @@ void initMat(mat * in, float scale) {
 void initMesh(mesh * in, int ptLen, int faLen) {
     in->ptCount = ptLen;
     in->faceCount = faLen;
-    in->pts = malloc(sizeof(vector) * MAX(ptLen,1) );
+    in->pts = malloc(sizeof(vector) * MAX(ptLen, 1) );
     in->faces = malloc(sizeof(face) * MAX(faLen, 1) );
 }
 
@@ -81,6 +82,7 @@ vector vectormultmat(vector vec, mat ma) {
         .y = vec.x * ma.m[0][1] + vec.y * ma.m[1][1] + vec.z * ma.m[2][1] + ma.m[3][1],
         .z = vec.x * ma.m[0][2] + vec.y * ma.m[1][2] + vec.z * ma.m[2][2] + ma.m[3][2],
         .w = vec.x * ma.m[0][3] + vec.y * ma.m[1][3] + vec.z * ma.m[2][3] + ma.m[3][3],
+        .v = vec.v,
     };
     return out;
 }
@@ -90,6 +92,8 @@ vector crossProduct(vector v1, vector v2) {
         .x = v1.y*v2.z - v1.z*v2.y,
         .y = v1.z*v2.x - v1.x*v2.z,
         .z = v1.x*v2.y - v1.y*v2.x,
+        .w = v1.w,
+        .v = v1.v,
     };
     return out;
 }
@@ -103,6 +107,8 @@ vector vecSubtract(vector v1, vector v2) {
         .x = v1.x - v2.x,
         .y = v1.y - v2.y,
         .z = v1.z - v2.z,
+        .w = v1.w,
+        .v = v1.v,
     };
     return out;
 }
@@ -113,6 +119,7 @@ vector vecAdd(vector v1, vector v2) {
         .y = v1.y + v2.y,
         .z = v1.z + v2.z,
         .w = v1.w + v2.w,
+        .v = v1.v,
     };
     return out;
 }
@@ -123,6 +130,7 @@ vector scale(vector v, float s) {
         .y = v.y * s,
         .z = v.z * s,
         .w = v.w * s,
+        .v = v.v,
     };
     return out;
 }
@@ -362,7 +370,9 @@ void dupeMesh(mesh *in, mesh *out) {
         vector p = {
             .x = in->pts[i].x,
             .y = in->pts[i].y,
-            .z = in->pts[i].z
+            .z = in->pts[i].z,
+            .w = in->pts[i].w,
+            .v = in->pts[i].v,
         };
         out->pts[i] = p;
     }
