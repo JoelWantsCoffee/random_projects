@@ -15,8 +15,6 @@
 #include "../libs/shells.h"
 #include "../libs/utils.h"
 
-#include "open-simplex-noise.h"
-
 void loop(input *ins, int  fc, void ** arg) {
     camera c;
     initCamera(&c, 400, 100);
