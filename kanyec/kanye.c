@@ -7,13 +7,14 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
-#include <signal.h> 
+#include <signal.h>
 
+#include "../libs/utils.h"
 #include "../libs/vecmath.h"
 #include "../libs/surfaces.h"
 #include "../libs/cam3d.h"
 #include "../libs/shells.h"
-#include "../libs/utils.h"
+
 
 void loop(input *ins, int  fc, void ** arg) {
     camera c;
@@ -66,16 +67,19 @@ void loop(input *ins, int  fc, void ** arg) {
     c.vrot = ((vector*) *arg)->y;
     c.hrot = ((vector*) *arg)->w;
 
-    
+    // c.flags = 0;
 
     mesh3d(&c, me);
 
     fputs("\033[1;1H", stdout);
-    draw(c.image);
+
+    // c.pic.flags = 0;
+
+    draw(&c.pic);
+
+
     // glutDisplayFunc(drawGL);
     // glutMainLoop();
-
-    //draw(c.image);
 
     freeCamera(&c);
     freeMesh(&me);
@@ -87,10 +91,10 @@ void *gi(void *ins) {
     while (1) getIns((input *) ins);
 }
 
-void sigintHandler(int sig_num) { 
+void sigintHandler(int sig_num) {
     resetKeys();
     exit(0);
-} 
+}
 
 int main() {
 
@@ -105,11 +109,11 @@ int main() {
 
     void * arg [3];
 
-    inportObj(&me, "tpot.obj");
+    inportObj(&me, "monkey.obj");
 
 
     struct osn_context * con;
-    open_simplex_noise(77374, &con);
+    //open_simplex_noise(77374, &con);
 
     arg[0] = (void*) &pos;
 
@@ -139,7 +143,7 @@ int main() {
     // for (int i = 0; i < d - 1; i++) {
     //     for (int j = 0; j < d - 1; j++) {
     //         int index = i + j*(d-1);
-            
+
     //         me.faces[index * 2].p1 = &me.pts[i + j*d];
     //         me.faces[index * 2].p2 = &me.pts[i + 1 + j*d];
     //         me.faces[index * 2].p3 = &me.pts[i + (j+1)*d];
@@ -158,16 +162,18 @@ int main() {
 
     pthread_create(&getInputs, NULL, gi, &(sh.ins));
 
-    liveInputs();
-
     initShell(&sh, &loop);
+
+    //sh.flags = 1;
+
+    liveInputs(&sh);
 
     int fc = 0;
 
     atexit(resetKeys);
     //on_exit(resetKeys);
 
-    signal(SIGINT, sigintHandler); 
+    signal(SIGINT, sigintHandler);
 
     while (1) {
         //getIns(&sh.ins);
