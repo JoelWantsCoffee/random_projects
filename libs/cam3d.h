@@ -10,22 +10,22 @@ typedef struct _camera {
     float pFar;
     float fov;
     float fovRad;
-    
-    int phong;
+
+    int flags;
 
     float charRatio;
     float drawDist;
     int width;
     int height;
 
-    surface image;
+    surface pic;
 
     float * dists;
 } camera;
 
 //functions
 void wipe(camera *cam) {
-    background(&(cam->image), mColour(0));
+    background(&(cam->pic), mColour(0));
     for (int i = 0; i<cam->width * cam->height; i++) cam->dists[i] = cam->drawDist;
 }
 
@@ -45,9 +45,9 @@ void initCamera(camera *cam, int w, int h) {
     cam->height = h;
     cam->charRatio = 2/1;
 
-    cam->phong = 1;
+    cam->flags = 1;
 
-    initSurf(&(cam->image), w, h);
+    initSurf(&(cam->pic), w, h);
     cam->dists = malloc(sizeof(float) * (w * h));
 
     wipe(cam);
@@ -55,7 +55,7 @@ void initCamera(camera *cam, int w, int h) {
 
 void freeCamera(camera *cam) {
     free(cam->dists);
-    freeSurf(&cam->image);
+    freeSurf(&cam->pic);
 }
 
 void getProjectionMat(camera cam, mat * out) {
@@ -75,7 +75,8 @@ void set3d(camera *cam, float x, float y, float z, colour col) {
         int i = ((int) x) + ((int) y) * w;
         if (cam->dists[i] > z) {
             cam->dists[i] = z;
-            cam->image.pixels[i] = col;
+            setCol(&cam->pic, col);
+	          set(&cam->pic, x, y);
         }
     }
 }
@@ -111,43 +112,54 @@ void line3d(camera *cam, float x1, float y1, float z1, float x2, float y2, float
     }
 }
 
-void fillTri3d(camera * cam, vector v1, vector v2, vector v3, int phong) {
-    v1.x = (int) v1.x;
-    v1.y = (int) v1.y;
-    v2.x = (int) v2.x;
-    v2.y = (int) v2.y;
-    v3.x = (int) v3.x;
-    v3.y = (int) v3.y;
+void fillTri3d(camera * cam, tri t) {
+    t.p1.x = (int) t.p1.x;
+    t.p1.y = (int) t.p1.y;
+    t.p2.x = (int) t.p2.x;
+    t.p2.y = (int) t.p2.y;
+    t.p3.x = (int) t.p3.x;
+    t.p3.y = (int) t.p3.y;
 
-    vector *miny = &v1;
-    vector *maxy = &v1;
-    vector *midy = &v1;
+    vector *miny = &t.p1;
+    vector *maxy = &t.p1;
+    vector *midy = &t.p1;
 
-    if (v2.y < miny->y) {
-	    miny = &v2;
+    if (t.p2.y < miny->y) {
+	    miny = &t.p2;
     } else {
-	    maxy = &v2;
+	    maxy = &t.p2;
     }
 
-    if (v3.y < miny->y) {
+    if (t.p3.y < miny->y) {
         midy = miny;
-        miny = &v3;
-    } else if (v3.y > maxy->y) {
+        miny = &t.p3;
+    } else if (t.p3.y > maxy->y) {
         midy = maxy;
-        maxy = &v3;
+        maxy = &t.p3;
     } else {
-	    midy = &v3;
+	      midy = &t.p3;
     }
 
-    colour c1, c2, cminy, cmidy, cmaxy;
-    colour c = cLerp(cLerp(cInt(miny->v), cInt(midy->v), 0.5), cInt(maxy->v), 0.33333);
+    colour c, c1, c2, cminy, cmidy, cmaxy;
 
-    if (phong) {
-        colour cminy = cInt(miny->v);
-        colour cmidy = cInt(midy->v);
-        colour cmaxy = cInt(maxy->v);
+    if (cam->flags & 1) {
+        cminy = cInt(((textureloc*) miny->v)->col);
+        cmidy = cInt(((textureloc*) midy->v)->col);
+        cmaxy = cInt(((textureloc*) maxy->v)->col);
+
+        // cminy = cInt(miny -> v);
+        // cmidy = cInt(midy -> v);
+        // cmaxy = cInt(maxy -> v);
+
+    } else {
+        // c = cLerp(cLerp(cInt(miny->v), cInt(midy->v), 0.5), cInt(maxy->v), 0.33333);
+        c = cLerp(cLerp(cInt(((textureloc*) miny->v)->col), cInt(((textureloc*) midy->v)->col), 0.5), cInt(((textureloc*) maxy->v)->col), 0.33333);
     }
 
+
+    int textured = (((textureinfo*) t.var)->flags & 2);
+
+    //printf("%d", cLerp(cLerp(cInt(miny->v), cInt(midy->v), 0.5), cInt(maxy->v), 0.33333).r);
     for (int y = miny->y; y < midy->y; y++) {
         float p1 = ((float) y - miny->y) / (midy->y - miny->y);
         float p2 = ((float) y - miny->y) / (maxy->y - miny->y);
@@ -158,58 +170,78 @@ void fillTri3d(camera * cam, vector v1, vector v2, vector v3, int phong) {
         float z1 = lerp(miny->z, midy->z, p1);
         float z2 = lerp(miny->z, maxy->z, p2);
 
-
-        if (phong) {
+        if (cam->flags & 1) {
             c1 = cLerp(cminy, cmidy, p1);
             c2 = cLerp(cminy, cmaxy, p2);
         }
-        
+
         int minx = MIN(x1, x2);
         int maxx = MAX(x1, x2);
 
-        float fcol = 0;
-
-        for (int x = MIN(x1, x2); x<MAX(x1, x2); x++) {
+        for (int x = minx; x<maxx; x++) {
 
             float pp = ((float) x - x1) / (x2 - x1);
 
             float z = lerp(z1, z2, pp);
 
-            if (phong) c = cLerp(c1, c2, pp);
+            if (cam->flags & 1) c = cLerp(c1, c2, pp);
+
+            if (textured) {
+                int x1, x2, x, y;
+                y = (int) lerp(((textureloc*) miny->v)->pos.y, ((textureloc*) maxy->v)->pos.y, p2);
+                x1 = (int) lerp(((textureloc*) miny->v)->pos.x, ((textureloc*) midy->v)->pos.x, p1);
+                x2 = (int) lerp(((textureloc*) miny->v)->pos.x, ((textureloc*) maxy->v)->pos.x, p2);
+                x = lerp(x1, x2, pp);
+                //printf("%f, ", ((textureloc*) miny->v)->pos.x);
+                int index = ((image*) ((textureinfo*) t.var)->texture)->width * y + x;
+                c = ((image*) ((textureinfo*) t.var)->texture)->pixels[index];
+                if (cam->flags & 1) c = cMult(c, cLerp(c1, c2, pp).r/255.0);
+            }
 
             set3d(cam, x, y, z, c);
+
         }
-    } 
+    }
 
     for (int y = midy->y; y < maxy->y; y++) {
         float p1 = ((float) y - midy->y) / (maxy->y - midy->y);
         float p2 = ((float) y - miny->y) / (maxy->y - miny->y);
-        
+
         int x1 = (int) lerp(midy->x, maxy->x, p1);
         int x2 = (int) lerp(miny->x, maxy->x, p2);
-        
+
         float z1 = lerp(midy->z, maxy->z, p1);
         float z2 = lerp(miny->z, maxy->z, p2);
 
-        if (phong) {
+        if (cam->flags & 1) {
             c1 = cLerp(cmidy, cmaxy, p1);
             c2 = cLerp(cminy, cmaxy, p2);
         }
 
-        int bcol = 0;
-
         int minx = MIN(x1, x2);
         int maxx = MAX(x1, x2);
 
-        for (int x = MIN(x1, x2); x<MAX(x1, x2); x++) {
+        for (int x = minx; x<maxx; x++) {
 
             float pp = ((float) x - x1) / (x2 - x1);
 
             float z = lerp(z1, z2, pp);
 
-            if (phong) c = cLerp(c1, c2, pp);
+            if (cam->flags & 1) c = cLerp(c1, c2, pp);
 
-            set3d(cam, x, y, z, c);    
+            if (textured) {
+                int x1, x2, x, y;
+                y = (int) lerp(((textureloc*) miny->v)->pos.y, ((textureloc*) maxy->v)->pos.y, p2);
+                x1 = (int) lerp(((textureloc*) midy->v)->pos.x, ((textureloc*) maxy->v)->pos.x, p1);
+                x2 = (int) lerp(((textureloc*) miny->v)->pos.x, ((textureloc*) maxy->v)->pos.x, p2);
+                x = lerp(x1, x2, pp);
+                //printf("%f, ", ((textureloc*) miny->v)->pos.x);
+                int index = ((image*) ((textureinfo*) t.var)->texture)->width * y + x;
+                c = ((image*) ((textureinfo*) t.var)->texture)->pixels[index];
+                if (cam->flags & 1) c = cMult(c, cLerp(c1, c2, pp).r/255.0);
+            }
+
+            set3d(cam, x, y, z, c);
         }
     }
 }
@@ -219,34 +251,6 @@ void tri3d(camera *cam, tri t) {
     float w = (float) cam->width;
     float h = (float) cam->height;
 
-    // float x1 = (t.p1.x * charRatio + 1) * w/2;
-    // float y1 = (t.p1.y + 1) * h/2;
-    // float x2 = (t.p2.x * charRatio + 1) * w/2;
-    // float y2 = (t.p2.y + 1) * h/2;
-    // float x3 = (t.p3.x * charRatio + 1) * w/2;
-    // float y3 = (t.p3.y + 1) * h/2;
-
-    // vector p1 = {
-    //     .x = x1,
-    //     .y = y1,
-    //     .z = t.p1.z,
-    //     .v = t.p1.v,
-    // };
-
-    // vector p2 = {
-    //     .x = x2,
-    //     .y = y2,
-    //     .z = t.p2.z,
-    //     .v = t.p2.v,
-    // };
-
-    // vector p3 = {
-    //     .x = x3,
-    //     .y = y3,
-    //     .z = t.p3.z,
-    //     .v = t.p3.v,
-    // };
-
     t.p1.x = (t.p1.x * charRatio + 1) * w/2;
     t.p1.y = (t.p1.y + 1) * h/2;
     t.p2.x = (t.p2.x * charRatio + 1) * w/2;
@@ -254,15 +258,15 @@ void tri3d(camera *cam, tri t) {
     t.p3.x = (t.p3.x * charRatio + 1) * w/2;
     t.p3.y = (t.p3.y + 1) * h/2;
 
-    fillTri3d(cam, t.p1, t.p2, t.p3, cam->phong);
+    fillTri3d(cam, t);
 
-    //setCol(&cam->image, mColour(t.var));
+    //setCol(&cam->pic, mColour(t.var));
 
-    //fillTriangle(&cam->image, x1, y1, x2, y2, x3, y3);
+    //fillTriangle(&cam->pic, x1, y1, x2, y2, x3, y3);
 
-    // line3d(cam, x1, y1, t.p1.z, x2, y2, t.p2.z);
-    // line3d(cam, x2, y2, t.p2.z, x3, y3, t.p3.z);
-    // line3d(cam, x3, y3, t.p3.z, x1, y1, t.p1.z);
+    // line3d(cam, t.p1.x, t.p1.y, t.p1.z, t.p2.x, t.p2.y, t.p2.z);
+    // line3d(cam, t.p2.x, t.p2.y, t.p2.z, t.p3.x, t.p3.y, t.p3.z);
+    // line3d(cam, t.p3.x, t.p3.y, t.p3.z, t.p1.x, t.p1.y, t.p1.z);
 }
 
 void clipMeshToCam(mesh *me) {
@@ -309,13 +313,13 @@ void mesh3d(camera *cam, mesh m) {
     }
 
     for (int i = 0; i<me.ptCount; i++) {
-        me.pts[i].v = intC( cMult(cInt(me.pts[i].v) , (((float) cols[i].r)/255.0) ));
+        me.pts[i].v = intC(cols[i]);
     }
 
     translateMesh(&me, cam->pos.x, cam->pos.y, -cam->pos.z);
     rotateMesh(&me, cam->vrot, cam->hrot, 0);
-    
-    mat proj; 
+
+    mat proj;
     vector pl = {.x = 0, .y = 0, .z = cam->pNear};
     vector pn = {.x = 0, .y = 0, .z = 1};
 
@@ -326,38 +330,66 @@ void mesh3d(camera *cam, mesh m) {
     getProjectionMat(*cam, &proj);
     clipMesh(&me, pl, pn);
     meshmultmat(&me, proj);
-    
+
     //copyMesh(&newMesh, &me);
 
-    clipMeshToCam(&me);
+    //clipMeshToCam(&me);
+
+    int randnum = 20;
 
     for (int i = 0; i<me.faceCount; i++) {
-        if (me.faces[i].var >= 0) tri3d(cam, ftot(me.faces[i]));
-    }
-}
+        if (me.faces[i].var >= 0) {
+          tri t = ftot(me.faces[i]);
+          t.var = (long) me.faces[i].info;
+          me.faces[i].info->loc[0].col = me.faces[i].p1->v;
+          me.faces[i].info->loc[1].col = me.faces[i].p2->v;
+          me.faces[i].info->loc[2].col = me.faces[i].p3->v;
+          t.p1.v = (long) &me.faces[i].info->loc[0];
+          t.p2.v = (long) &me.faces[i].info->loc[1];
+          t.p3.v = (long) &me.faces[i].info->loc[2];
 
-int pullSubString(char * in, int inLen, char * out, char b, int index) {
-    /*printf("\n---------------stat--------------\n");
-    printf("Char: (%c)\n", b);
-    printf("In len: (%d)\n", inLen);
-    printf("Index: (%d)\n", index);
-    printf("in: %s", in);*/
-    int c = 0;
-    for (int i = 0; i<inLen; i++) {
-        //printf("(%c vs %c)\n", in[i], b);
-        if (c == index) {
-            int j;
-            for (j = 0; (!(in[i + j] == b) && (j+i+1 < inLen)); j++) {
-                out[j] = in[i+j];
+
+
+          //----------- GENERATING TEXTURE, NOT ACTUALLY IMPORTANT---------------
+          // for (int j = 0; j<3; j++) {
+          //     me.faces[i].info->loc[j].pos.x = rand() % randnum;
+          //     me.faces[i].info->loc[j].pos.y = rand() % randnum;
+          // }
+
+          me.faces[i].info->loc[0].pos.x = 0;
+          me.faces[i].info->loc[0].pos.y = 0;
+
+          me.faces[i].info->loc[1].pos.x = randnum - 1;
+          me.faces[i].info->loc[1].pos.y = 0;
+
+          me.faces[i].info->loc[2].pos.x = randnum - 1;
+          me.faces[i].info->loc[2].pos.y = randnum - 1;
+
+
+          image img;
+          initImage(&img, randnum, randnum);
+          for (int j = 0; j<randnum; j++) {
+            for (int k = 0; k<randnum; k++) {
+
+              img.pixels[j*randnum + k] = fColour((j * 255.0)/((float) randnum), (k * 255.0)/((float) randnum), 255);
+
+              // int on = ((j + k % 2) % 2);
+              // img.pixels[j*randnum + k] =  fColour(255 * on, 255 * (1 - on), 255 * on );
+
+
             }
-            out[j] = '\0';
-            return j+1;
-        }
+          }
 
-        if (in[i] == b) c++;
+          me.faces[i].info->texture = &img;
+          me.faces[i].info->flags = 2;
+
+          //----------- GENERATING TEXTURE,OVER GO BACK TO YOUR DRINKS ---------------
+          tri3d(cam, t);
+	  /*one last texture thingo*/ freeImage(&img); /*k now I'm actually done*/
+        }
     }
-    return 0;
 }
+
 
 void inportObj(mesh *me, char * fileName) {
     FILE *fp;

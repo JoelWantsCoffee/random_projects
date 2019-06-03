@@ -11,8 +11,19 @@ typedef struct _vector {
     float y;
     float z;
     float w;
-    int v;
+    long v;
 } vector;
+
+typedef struct _textureloc {
+  int col;
+  vec2d pos;
+} textureloc;
+
+typedef struct _textureinfo {
+  int flags; // Textured? Lighted?
+  void * texture;
+  textureloc loc [3];
+} textureinfo;
 
 typedef struct _tri {
     vector p1;
@@ -26,6 +37,7 @@ typedef struct _face {
     vector *p2;
     vector *p3;
     long var;
+    textureinfo * info;
 } face;
 
 typedef struct _mesh {
@@ -33,6 +45,7 @@ typedef struct _mesh {
     size_t ptCount;
     face * faces;
     size_t faceCount;
+    int flags;
 } mesh;
 
 
@@ -54,11 +67,14 @@ void initMesh(mesh * in, int ptLen, int faLen) {
     in->faceCount = faLen;
     in->pts = malloc(sizeof(vector) * MAX(ptLen, 1) );
     in->faces = malloc(sizeof(face) * MAX(faLen, 1) );
+    for (int i = 0; i<faLen; i++) in->faces[i].info = malloc(sizeof(textureinfo));
+    in->flags = 1;
 }
 
 void freeMesh(mesh * me) {
     free(me->pts);
     me->pts = NULL;
+    for (int i = 0; i<me->faceCount; i++) free(me->faces[i].info);
     free(me->faces);
     me->faces = NULL;
 }
@@ -254,7 +270,7 @@ int clipFaceNums(vector pl, vector pn, face *in, int *nPts) {
     } else {
 	    oc++;
     }
-    
+
     if (d2 >= 0) {
     	ic++;
     } else {
@@ -264,7 +280,7 @@ int clipFaceNums(vector pl, vector pn, face *in, int *nPts) {
 
     if (ic == 0) {
         *nPts = 0;
-	    return 0;  
+	    return 0;
     } else if (ic == 3) {
         *nPts = 0;
         return 1;
@@ -305,20 +321,20 @@ int clipFace(vector pl, vector pn, face *in, face *out [2], vector *op [2], int 
     if (d1 >= 0) {
     	ipts[ic++] = &meOut->pts[in->p2 - inDex];
     } else {
-	    opts[oc++] = &meOut->pts[in->p2 - inDex];
+	opts[oc++] = &meOut->pts[in->p2 - inDex];
     }
-    
+
     if (d2 >= 0) {
     	ipts[ic++] = &meOut->pts[in->p3 - inDex];
     } else {
-	    opts[oc++] = &meOut->pts[in->p3 - inDex];
+	opts[oc++] = &meOut->pts[in->p3 - inDex];
     }
 
-    
+
 
     if (ic == 0) {
         *nPts = 0;
-	    return 0;  
+	    return 0;
     } else if (ic == 3) {
         out[0]->p1 = &meOut->pts[in->p1 - inDex];
         out[0]->p2 = &meOut->pts[in->p2 - inDex];
@@ -403,15 +419,15 @@ void clipMesh(mesh *me, vector pl, vector pn) {
     mesh out;
 
     if (faCount > 0) {
-        
-        
+
+
         initMesh(&out, me->ptCount + ptCount, faCount);
-        
+
         ptCount = 0;
         faCount = 0;
 
         for (int i = 0; i<me->ptCount; i++) out.pts[i] = me->pts[i];
-        
+
         for (int i = 0; i<me->faceCount; i++) {
             pp[0] = &out.pts[me->ptCount + ptCount];
             pp[1] = &out.pts[me->ptCount + ptCount + 1];
@@ -426,11 +442,10 @@ void clipMesh(mesh *me, vector pl, vector pn) {
         }
 
 
-        //freeMesh(me);
+        freeMesh(me);
 
         copyMesh(&out, me);
-
     }
-    
+
     // *me = out;
 }

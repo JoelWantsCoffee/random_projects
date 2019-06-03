@@ -7,12 +7,14 @@ typedef struct _input {
 typedef struct _shell {
     void (*fp)(input*, int, void **);
     input ins;
+    int flags;
 } shell;
 
 //functions
 void initShell(shell *in, void (*fp)(input *, int, void **)) {
     in->fp = fp;
     in->ins.keys = ("wasdijkl");
+    in->flags = 0;
 }
 
 void run(shell *f, int frameCount, void ** arg, float frameRate) {
@@ -26,7 +28,8 @@ void run(shell *f, int frameCount, void ** arg, float frameRate) {
     }
 }
 
-void liveInputs() {
+void liveInputs(shell *sh) {
+    if (sh->flags & 1) system("xset r rate 10 100");
     static struct termios told, tnew;
     tcgetattr( STDIN_FILENO, &told);
     tnew = told;
@@ -38,7 +41,6 @@ void* getIns(input *in) {
     char b[5];
     b[0] = ' ';
     int size = sizeof(in->on);
-    system("xset r rate 10 100");
     read(STDIN_FILENO, b, 5);
     for (int i = 0; i<size; i++) {
         if (b[0] == in->keys[i]) {
@@ -51,7 +53,10 @@ void* getIns(input *in) {
 }
 
 void resetKeys() {
-    printf("exit");
+    static struct termios t;
+    tcgetattr( STDIN_FILENO, &t);
+    t.c_lflag |= (ICANON | ECHO);
+    tcsetattr( STDIN_FILENO, TCSANOW, &t);
     system("xset r rate 220 20");
 }
 

@@ -1,6 +1,7 @@
 #define sign(a) (((a)<(0))?(-1):(1))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
+#define mv(x,y) printf("\033[%d;%dH", (y), (x))
 
 //structs
 typedef struct _colour {
@@ -9,72 +10,90 @@ typedef struct _colour {
     int b;
 } colour;
 
+typedef struct _image {
+  colour * pixels;
+  size_t width;
+  size_t height;
+} image;
+
 typedef struct _surface {
     colour lastCol;
+    char cols [9];
+    int colLen;
+    int * pixelsPrev;
+    size_t pixelsLength;
+    image img;
     int width;
     int height;
-    size_t pixelsLength;
-    char cols [9];
-    int colLen; 
-    colour * pixels;
+    int flags; // 0 = efficient drawing; // 2 = characters
 } surface;
 
-typedef struct _dvec2d {
-    int x;
-    int y;
-} dvec2d;
-
 //functions
-float lerp(float a, float b, float dist) {
-    return (a*(1 - dist) + b*dist);
+colour mColour(int);
+
+void freeImage(image *img) {
+  free(img->pixels);
+}
+
+void initImage(image *img, int w, int h) {
+  img->pixels = malloc(w * h * sizeof(colour));
+  img->width = w;
+  img->height = h;
 }
 
 void initSurf(surface *surf, int w, int h) {
     strcpy(surf->cols, " .,>xX#@@");
     surf->colLen = 9;
-    surf->pixelsLength = w*h;
     surf->width = w;
     surf->height = h;
-    surf->pixels = malloc(w * h * sizeof(colour));
-}  
+    surf->pixelsLength = w*h;
+    surf->pixelsPrev = malloc(w * h * sizeof(int));
+    initImage(&surf->img, w, h);
+    surf->flags = 0 | 1;
+    for (int i = 0; i<surf->pixelsLength; i++) {
+        surf->img.pixels[i] = mColour(0);
+        surf->pixelsPrev[i] = 0;
+    }
+}
 
 void freeSurf(surface *surf) {
-    free(surf->pixels);
+    freeImage(&surf->img);
+    free(surf->pixelsPrev);
 }
 
 int eq(colour a, colour b) {
-    return ((a.r == b.r) && (a.g == b.g) && (a.b == b.b)); 
+    return ((a.r == b.r) && (a.g == b.g) && (a.b == b.b));
 }
 
-void draw(surface surf) {
-    for (int j = 0; j<surf.height; j++) {
-        for (int i = 0; i<surf.width; i++) {
-            colour col = surf.pixels[i + j*surf.width];
-            //float tone = MIN(MAX( ((float)fpcol.r + col.g + col.b)/(3*256), 0), 255);	
-
-            
-            if (!(eq(col, surf.pixels[i + j*surf.width - 1]))) {
-                fprintf(stdout, "\033[48;2;%d;%d;%dm ", col.r, col.g, col.b);
+void draw(surface *surf) {
+    mv(0,0);
+    int needtomove = 1;
+    for (int j = 0; j<surf->height; j++) {
+        for (int i = 0; i<surf->width; i++) {
+            int index = i + j*surf->width;
+            colour col = surf->img.pixels[index];
+            if (surf->flags & 2) {
+                float tone = MIN(MAX( ((float) (col.r + col.g + col.b))/3.0, 0), 254);
+                int ind = (int) ((tone/255.0)*((float) surf->colLen));
+                fprintf(stdout, "%c", surf->cols[ind]);
             } else {
-                fprintf(stdout, " ");
+                if (surf->pixelsPrev[index] && (surf->flags & 1)) {
+                    needtomove = 1;
+                } else {
+                    if (needtomove) mv(i, j);
+                    if (!(eq(col, surf->img.pixels[index - 1]))) {
+                        fprintf(stdout, "\033[48;2;%d;%d;%dm ", col.r, col.g, col.b);
+                    } else {
+                        fprintf(stdout, " ");
+                    }
+                    needtomove = 0;
+                }
             }
-
-
-
-            //sprintf(buff + c, "%s", temp);
-
-            // sprintf(buff + c, "%s", temp);
-
-	        //putchar(surf.cols[(int) floor(tone*(surf.colLen - 1)) ]);
         }
         fprintf(stdout, "\n");
-
-        // c++;
-        //sprintf(buff + c, "\n");
     }
     fflush(stdout);
-    //printf("%s", buff);
-} 
+}
 
 int getIndex(surface *surf, int x, int y) {
     return x + y*surf->width;
@@ -83,9 +102,9 @@ int getIndex(surface *surf, int x, int y) {
 
 colour cNeg(colour c) {
     colour out = {
-	.r = -c.r,
-	.g = -c.g,
-	.b = -c.b,
+    	.r = -c.r,
+    	.g = -c.g,
+    	.b = -c.b,
     };
     return out;
 }
@@ -96,13 +115,11 @@ void cPlus(colour *c, colour col) {
     c->b += col.g;
 }
 
-colour mColour(int);
-
 colour cMult(colour c, float a) {
     colour out = {
         .r = c.r * a,
         .g = c.g * a,
-        .b = c.b * a,	
+        .b = c.b * a,
     };
     return out;
 }
@@ -130,39 +147,39 @@ int intC(colour c) {
     return (((c.r & 0x0000FF) << 8*2) | ((c.g & 0x0000FF) << 8) | (c.b & 0x0000FF));
 }
 
-void drawStipple(surface surf, int d) { 
+void drawStipple(surface * surf, int d) {
     surface td;
-    initSurf(&td, surf.width, surf.height);
+    initSurf(&td, surf->width, surf->height);
 
-    for (int i = 0; i<surf.pixelsLength; i++) td.pixels[i] = surf.pixels[i];
+    for (int i = 0; i<surf->pixelsLength; i++) td.img.pixels[i] = surf->img.pixels[i];
 
-    for (int j = 0; j<surf.height; j ++) {
-        for (int i = 0; i<surf.width;  i++) {
-            colour col = td.pixels[getIndex(&td, i, j)];
-	
-	    int pCols = d;
+    for (int j = 0; j<surf->height; j ++) {
+        for (int i = 0; i<surf->width;  i++) {
+            colour col = td.img.pixels[getIndex(&td, i, j)];
+
+      	    int pCols = d;
 
             colour aCol = {
-		//round((surf.colLen-1) * gCol / 255) * 255/(surf.colLen-1);
-		.r = round((pCols - 1) * col.r / 255) * 255/(pCols - 1),
-		.g = round((pCols - 1) * col.g / 255) * 255/(pCols - 1),
-		.b = round((pCols - 1) * col.b / 255) * 255/(pCols - 1),
-	    };
-	    
+          		//round((surf->colLen-1) * gCol / 255) * 255/(surf->colLen-1);
+          		.r = round((pCols - 1) * col.r / 255) * 255/(pCols - 1),
+          		.g = round((pCols - 1) * col.g / 255) * 255/(pCols - 1),
+          		.b = round((pCols - 1) * col.b / 255) * 255/(pCols - 1),
+      	    };
+
 
             colour error = col;
-	    
-	    cPlus(&error, cNeg(aCol));
-            
-            td.pixels[getIndex(&td, i, j)] = aCol;
 
-            cPlus(&td.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , j				) ], cMult(error , 7.0 / 16.0));
-            cPlus(&td.pixels[ getIndex(&td, MAX(i - 1, 0)	    , MIN(j + 1, td.height-1)	) ], cMult(error , 3.0 / 16.0));
-            cPlus(&td.pixels[ getIndex(&td, i			    , MIN(j + 1, td.height-1)	) ], cMult(error , 5.0 / 16.0));
-            cPlus(&td.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , MIN(j + 1, td.height-1)	) ], cMult(error , 1.0 / 16.0));
+	           cPlus(&error, cNeg(aCol));
+
+            td.img.pixels[getIndex(&td, i, j)] = aCol;
+
+            cPlus(&td.img.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , j				) ], cMult(error , 7.0 / 16.0));
+            cPlus(&td.img.pixels[ getIndex(&td, MAX(i - 1, 0)	    , MIN(j + 1, td.height-1)	) ], cMult(error , 3.0 / 16.0));
+            cPlus(&td.img.pixels[ getIndex(&td, i			    , MIN(j + 1, td.height-1)	) ], cMult(error , 5.0 / 16.0));
+            cPlus(&td.img.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , MIN(j + 1, td.height-1)	) ], cMult(error , 1.0 / 16.0));
         }
-    } 
-    draw(td);
+    }
+    draw(&td);
     freeSurf(&td);
 }
 
@@ -172,7 +189,8 @@ void setCol(surface *surf, colour col) {
 
 void set(surface *surf, int x, int y) {
     if ((x >= 0) && (y >= 0) && (x < surf->width) && (y < surf->height)) {
-        surf->pixels[(x + (y * surf->width))] = surf->lastCol;
+        surf->pixelsPrev[(x + (y * surf->width))] = (eq(surf->lastCol, surf->img.pixels[(x + (y * surf->width))]));
+        surf->img.pixels[(x + (y * surf->width))] = surf->lastCol;
     }
 }
 
@@ -209,22 +227,22 @@ void triangle(surface *surf, float x1, float y1, float x2, float y2, float x3, f
 }
 
 void fillTriangle(surface *surf, float x1, float y1, float x2, float y2, float x3, float y3) {
-    dvec2d v1 = {
+    vec2d v1 = {
         .x = (int) x1,
         .y = (int) y1,
     };
-    dvec2d v2 = {
+    vec2d v2 = {
         .x = (int) x2,
         .y = (int) y2,
     };
-    dvec2d v3 = {
+    vec2d v3 = {
         .x = (int) x3,
         .y = (int) y3,
     };
 
-    dvec2d *miny = &v1;
-    dvec2d *maxy = &v1;
-    dvec2d *midy = &v1;
+    vec2d *miny = &v1;
+    vec2d *maxy = &v1;
+    vec2d *midy = &v1;
 
     if (v2.y < miny->y) {
 	    miny = &v2;
@@ -248,35 +266,35 @@ void fillTriangle(surface *surf, float x1, float y1, float x2, float y2, float x
 
         int x1 = (int) lerp(miny->x, midy->x, p1);
         int x2 = (int) lerp(miny->x, maxy->x, p2);
-        
+
         for (int x = MIN(x1, x2); x<MAX(x1, x2); x++) {
             set(surf, x, y);
         }
-    } 
+    }
 
     for (int y = midy->y; y < maxy->y; y++) {
         float p1 = ((float) y - midy->y) / (maxy->y - midy->y);
         float p2 = ((float) y - miny->y) / (maxy->y - miny->y);
-        
+
         int x1 = (int) lerp(midy->x, maxy->x, p1);
         int x2 = (int) lerp(miny->x, maxy->x, p2);
-        
+
         for (int x = MIN(x1, x2); x<MAX(x1, x2); x++) {
-            set(surf, x, y);	    
+            set(surf, x, y);
         }
     }
 }
 
 void background(surface *surf, colour col) {
     for (int i = 0; i<surf->pixelsLength; i++) {
-        surf->pixels[i] = col;
+        surf->img.pixels[i] = col;
     }
 }
 
-colour fColour(int r, int g, int b) {    
-    r = MAX(MIN(r, 255), 0);    
-    g = MAX(MIN(g, 255), 0);    
-    b = MAX(MIN(b, 255), 0);    
+colour fColour(int r, int g, int b) {
+    r = MAX(MIN(r, 255), 0);
+    g = MAX(MIN(g, 255), 0);
+    b = MAX(MIN(b, 255), 0);
     colour col = {
         .r = r,
         .g = g,
@@ -293,4 +311,3 @@ colour mColour(int v) {
     };
     return col;
 }
-
