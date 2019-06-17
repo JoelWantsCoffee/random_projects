@@ -74,7 +74,7 @@ void initMesh(mesh * in, int ptLen, int faLen) {
 void freeMesh(mesh * me) {
     free(me->pts);
     me->pts = NULL;
-    for (int i = 0; i<me->faceCount; i++) free(me->faces[i].info);
+    //for (int i = 0; i<me->faceCount; i++) free(me->faces[i].info);
     free(me->faces);
     me->faces = NULL;
 }
@@ -396,6 +396,8 @@ void dupeMesh(mesh *in, mesh *out) {
         out->faces[i].p1 = &out->pts[in->faces[i].p1 - in->pts];
         out->faces[i].p2 = &out->pts[in->faces[i].p2 - in->pts];
         out->faces[i].p3 = &out->pts[in->faces[i].p3 - in->pts];
+	    out->faces[i].var = in->faces[i].var;
+	    out->faces[i].info = in->faces[i].info;
     }
 }
 
@@ -440,10 +442,7 @@ void clipMesh(mesh *me, vector pl, vector pn) {
             faCount += faCountInc;
             ptCount += t;
         }
-
-
-        freeMesh(me);
-
+	//reee freeing me breaks everything why tho ahhhh
         copyMesh(&out, me);
     }
 

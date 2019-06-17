@@ -8,6 +8,22 @@ float lerp(float a, float b, float dist) {
     return (a*(1 - dist) + b*dist);
 }
 
+vec2d lerp2d(vec2d a, vec2d b, float d) {
+    vec2d out = {
+        .x = lerp(a.x, b.x, d),
+        .y = lerp(a.y, b.y, d),
+    };
+    return out;
+}
+
+vec2d svec2d(vec2d v, float a) {
+    vec2d out = {
+        .x = v.x*a,
+        .y = v.y*a,
+    };
+    return out;
+}
+
 float map(float a, float min, float max, float nmin, float nmax) {
     return ((a - min)/(max - min))*nmax + nmin;
 }

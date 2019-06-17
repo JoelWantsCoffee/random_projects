@@ -115,7 +115,16 @@ void cPlus(colour *c, colour col) {
     c->b += col.g;
 }
 
-colour cMult(colour c, float a) {
+colour cMult(colour a, colour b) {
+    colour out = {
+        .r = a.r * b.r / 255,
+        .g = a.g * b.g / 255,
+        .b = a.b * b.b / 255,
+    };
+    return out;
+}
+
+colour cScale(colour c, float a) {
     colour out = {
         .r = c.r * a,
         .g = c.g * a,
@@ -173,10 +182,10 @@ void drawStipple(surface * surf, int d) {
 
             td.img.pixels[getIndex(&td, i, j)] = aCol;
 
-            cPlus(&td.img.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , j				) ], cMult(error , 7.0 / 16.0));
-            cPlus(&td.img.pixels[ getIndex(&td, MAX(i - 1, 0)	    , MIN(j + 1, td.height-1)	) ], cMult(error , 3.0 / 16.0));
-            cPlus(&td.img.pixels[ getIndex(&td, i			    , MIN(j + 1, td.height-1)	) ], cMult(error , 5.0 / 16.0));
-            cPlus(&td.img.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , MIN(j + 1, td.height-1)	) ], cMult(error , 1.0 / 16.0));
+            cPlus(&td.img.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , j				) ], cScale(error , 7.0 / 16.0));
+            cPlus(&td.img.pixels[ getIndex(&td, MAX(i - 1, 0)	    , MIN(j + 1, td.height-1)	) ], cScale(error , 3.0 / 16.0));
+            cPlus(&td.img.pixels[ getIndex(&td, i			    , MIN(j + 1, td.height-1)	) ], cScale(error , 5.0 / 16.0));
+            cPlus(&td.img.pixels[ getIndex(&td, MIN(i + 1, td.width-1)  , MIN(j + 1, td.height-1)	) ], cScale(error , 1.0 / 16.0));
         }
     }
     draw(&td);
