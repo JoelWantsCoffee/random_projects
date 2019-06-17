@@ -43,7 +43,8 @@ int main() {
   long double y = 0.1127;
 
   surface surf;
-  initSurf(&surf, 600, 160);
+  initSurf(&surf, 400, 100);
+  surf.flags = 0;
   long double aspect = surf.width / surf.height;
   while (1) {
     int reps = MIN(20 / sqrt(mag), 300) ;
@@ -57,12 +58,12 @@ int main() {
           temp = fx(temp, pl);
           //printf("%d ", (int) temp.a);
         }
-        setCol(&surf, mColour(map(k, 0, reps, 0, 255)  ));
+        setCol(&surf, cLerp(mColour(0), mColour(255),  ((float) k)/reps));
         set(&surf, i, j);
       }
     }
-    system("clear");
-    drawStipple(surf);
+    //system("clear");
+    draw(&surf);
     mag /= 1.01;
     printf("%d, %Lf\n", reps, mag);
   }
