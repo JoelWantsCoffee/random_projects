@@ -1,2 +1,2 @@
 make:
-	gcc -g kanye.c -lm -pthread
+	gcc -g -std=gnu99 kanye.c -lm -pthread
