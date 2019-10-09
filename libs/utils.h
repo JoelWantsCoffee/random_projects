@@ -25,7 +25,7 @@ vec2d svec2d(vec2d v, float a) {
 }
 
 float map(float a, float min, float max, float nmin, float nmax) {
-    return ((a - min)/(max - min))*nmax + nmin;
+    return ((a - min)/(max - min))*(nmax - nmin) + nmin;
 }
 
 int pullSubString(char * in, int inLen, char * out, char b, int index) {
