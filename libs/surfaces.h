@@ -65,6 +65,41 @@ int eq(colour a, colour b) {
     return ((a.r == b.r) && (a.g == b.g) && (a.b == b.b));
 }
 
+colour fColour(int r, int g, int b) {
+    r = MAX(MIN(r, 255), 0);
+    g = MAX(MIN(g, 255), 0);
+    b = MAX(MIN(b, 255), 0);
+    colour col = {
+        .r = r,
+        .g = g,
+        .b = b,
+    };
+    return col;
+}
+
+colour mColour(int v) {
+    colour col = {
+        .r = v,
+        .g = v,
+        .b = v,
+    };
+    return col;
+}
+
+void printImage(image *img) {
+    for (int j = 0; j<img->height; j++) {
+        for (int i = 0; i<img->width; i++) {
+            int index = i + j*img->width;
+            colour col = img->pixels[index];
+	    fprintf(stdout, "\033[48;2;%d;%d;%dm ", col.r, col.g, col.b);
+	    fprintf(stdout, "\033[48;2;%d;%d;%dm ", col.r, col.g, col.b);
+//fprintf(stdout, "(%d;%d;%d)", col.r, col.g, col.b);
+        }
+        fprintf(stdout, "\n");
+    }
+    fflush(stdout);
+}
+
 void draw(surface *surf) {
     mv(0,0);
     int needtomove = 1;
@@ -192,6 +227,17 @@ void drawStipple(surface * surf, int d) {
     freeSurf(&td);
 }
 
+void lodeImage(image *img, unsigned char *data) {
+    for (int i = 0; i<img->width; i++) {
+	for (int j = 0; j < img->height; j++) {
+	    int ind = i + j*img->width;
+	    img->pixels[ind] = fColour((int) data[ind*4], (int) data[ind*4 + 1], (int) data[ind*4 + 2]);
+	    //img->pixels[ind] = mColour((int) data[ind*4]);
+	}
+    }
+}
+
+
 void setCol(surface *surf, colour col) {
     surf->lastCol = col;
 }
@@ -300,23 +346,26 @@ void background(surface *surf, colour col) {
     }
 }
 
-colour fColour(int r, int g, int b) {
-    r = MAX(MIN(r, 255), 0);
-    g = MAX(MIN(g, 255), 0);
-    b = MAX(MIN(b, 255), 0);
-    colour col = {
-        .r = r,
-        .g = g,
-        .b = b,
-    };
-    return col;
+image decodeImage(long double * in, int w, int h) {
+    image out;
+    initImage(&out, w, h);
+    for (int i = 0; i < w; i++) {
+	for (int j = 0; j < h; j++) {
+	    int ind = i + j*w;
+	    out.pixels[ind] = mColour(255 * in[ind]);
+	}
+    }
+    return out;
 }
 
-colour mColour(int v) {
-    colour col = {
-        .r = v,
-        .g = v,
-        .b = v,
-    };
-    return col;
+long double * encodeImage(image * in) {
+    long double * out = malloc(sizeof(long double) * in->width * in->height);
+    for (int i = 0; i < in->width; i++) {
+	for (int j = 0; j < in->height; j++) {
+	    int ind = i + j*in->width;
+	    out[ind] = (((double)in->pixels[ind].r)+((double)in->pixels[ind].g)+((double)in->pixels[ind].b))/(255.0 * 3.0);
+	}
+    }
+    return out;
 }
+

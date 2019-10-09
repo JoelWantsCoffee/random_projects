@@ -45,7 +45,7 @@ void initCamera(camera *cam, int w, int h) {
     cam->height = h;
     cam->charRatio = 2/1;
 
-    cam->flags = 5;  
+    cam->flags = 5;
 
     initSurf(&(cam->pic), w, h);
     cam->dists = malloc(sizeof(float) * (w * h));
@@ -115,10 +115,13 @@ void line3d(camera *cam, float x1, float y1, float z1, float x2, float y2, float
 void fillTri3d(camera * cam, tri t) {
     t.p1.x = (int) t.p1.x;
     t.p1.y = (int) t.p1.y;
+    //t.p1.z = 1 / t.p1.z;
     t.p2.x = (int) t.p2.x;
     t.p2.y = (int) t.p2.y;
+    //t.p2.z = 1 / t.p2.z;
     t.p3.x = (int) t.p3.x;
     t.p3.y = (int) t.p3.y;
+    //t.p3.z = 1 / t.p3.z;
 
     vector *miny = &t.p1;
     vector *maxy = &t.p1;
@@ -332,12 +335,12 @@ void mesh3d(camera *cam, mesh *m) {
     }
 
     getProjectionMat(*cam, &proj);
-    //clipMesh(&me, pl, pn);
+    clipMesh(&me, pl, pn);
     meshmultmat(&me, proj);
 
-    //copyMesh(&newMesh, &me);
+    // copyMesh(&newMesh, &me);
 
-    //clipMeshToCam(&me);
+    clipMeshToCam(&me);
 
     int randnum = 20;
 
@@ -353,12 +356,13 @@ void mesh3d(camera *cam, mesh *m) {
             t.p3.v = (long) &me.faces[i].info->loc[2];
 
             //----------- GENERATING TEXTURE, NOT ACTUALLY IMPORTANT---------------
-            // for (int j = 0; j<3; j++) {
+	    /*
+	    // for (int j = 0; j<3; j++) {
             //     me.faces[i].info->loc[j].pos.x = rand() % randnum;
             //     me.faces[i].info->loc[j].pos.y = rand() % randnum;
             // }
 
-            /*
+
 
             me.faces[i].info->loc[0].pos.x = 0;
             me.faces[i].info->loc[0].pos.y = 0;
