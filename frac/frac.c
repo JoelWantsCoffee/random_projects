@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "../libs/utils.h"
 #include "../libs/surfaces.h"
 
 typedef struct _cnum {
@@ -15,10 +16,6 @@ cnum cn(long double a, long double b) {
     .b = b,
   };
   return out;
-}
-
-float map(float num, float min, float max, float nmin, float nmax) {
-  return ((num + min)/(min + max))*(nmax - nmin) + nmin;
 }
 
 cnum square(cnum n) {
@@ -39,18 +36,18 @@ float mag2(cnum n) {
 
 int main() {
   long double mag = 2;
-  long double x = -0.7453;
-  long double y = 0.1127;
+  long double x = -0.7463;
+  long double y = 0.1102;
 
   surface surf;
-  initSurf(&surf, 400, 100);
+  initSurf(&surf, 200, 100);
   surf.flags = 0;
   long double aspect = surf.width / surf.height;
   while (1) {
     int reps = MIN(20 / sqrt(mag), 300) ;
     for (int j = 0; j<surf.height; j++) {
       for (int i = 0; i<surf.width; i++) {
-        cnum pl = cn(map(i, 0, surf.width, x - mag, x + mag), map(j, 0, surf.height, y-mag/aspect*2, y+mag/aspect*2));
+        cnum pl = cn(map(i, 0, surf.width, x - mag, x + mag), map(j, 0, surf.height, y - mag, y + mag));
         cnum temp = pl;
         int k = 0;
         for (k = 0; k<reps; k++) {
@@ -58,10 +55,11 @@ int main() {
           temp = fx(temp, pl);
           //printf("%d ", (int) temp.a);
         }
-        setCol(&surf, cLerp(mColour(0), mColour(255),  ((float) k)/reps));
+        setCol(&surf, cLerp(fColour(0, 255, 255), fColour(255, 0, 255),  ((float) k)/reps));
         set(&surf, i, j);
       }
     }
+    mv(0,0);
     //system("clear");
     draw(&surf);
     mag /= 1.01;
